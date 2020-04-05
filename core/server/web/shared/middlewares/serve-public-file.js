@@ -2,20 +2,41 @@ const crypto = require('crypto');
 const fs = require('fs-extra');
 const path = require('path');
 const config = require('../../../config');
-const urlService = require('../../../services/url');
+const urlUtils = require('../../../lib/url-utils');
+const common = require('../../../lib/common');
 
 function createPublicFileMiddleware(file, type, maxAge) {
     let content;
     const publicFilePath = config.get('paths').publicFilePath;
     const filePath = file.match(/^public/) ? path.join(publicFilePath, file.replace(/^public/, '')) : path.join(publicFilePath, file);
     const blogRegex = /(\{\{blog-url\}\})/g;
-    const apiRegex = /(\{\{api-url\}\})/g;
+    const adminRegex = /(\{\{admin-url\}\})/g;
 
     return function servePublicFile(req, res, next) {
         if (content) {
             res.writeHead(200, content.headers);
             return res.end(content.body);
         }
+
+        // send image files directly and let express handle content-length, etag, etc
+        if (type.match(/^image/)) {
+            return res.sendFile(filePath, (err) => {
+                if (err && err.status === 404) {
+                    // ensure we're triggering basic asset 404 and not a templated 404
+                    return next(new common.errors.NotFoundError({
+                        message: common.i18n.t('errors.errors.imageNotFound'),
+                        code: 'STATIC_FILE_NOT_FOUND',
+                        property: err.path
+                    }));
+                }
+
+                if (err) {
+                    return next(err);
+                }
+            });
+        }
+
+        // modify text files before caching+serving to ensure URL placeholders are transformed
         fs.readFile(filePath, (err, buf) => {
             if (err) {
                 return next(err);
@@ -24,8 +45,8 @@ function createPublicFileMiddleware(file, type, maxAge) {
             let str = buf.toString();
 
             if (type === 'text/xsl' || type === 'text/plain' || type === 'application/javascript') {
-                str = str.replace(blogRegex, urlService.utils.urlFor('home', true).replace(/\/$/, ''));
-                str = str.replace(apiRegex, urlService.utils.urlFor('api', {cors: true, version: 'v0.1', versionType: 'content'}, true));
+                str = str.replace(blogRegex, urlUtils.urlFor('home', true).replace(/\/$/, ''));
+                str = str.replace(adminRegex, urlUtils.urlFor('admin', true).replace(/\/$/, ''));
             }
 
             content = {

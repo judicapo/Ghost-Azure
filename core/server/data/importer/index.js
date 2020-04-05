@@ -5,7 +5,7 @@ var _ = require('lodash'),
     os = require('os'),
     glob = require('glob'),
     uuid = require('uuid'),
-    extract = require('extract-zip'),
+    {extract} = require('@tryghost/zip'),
     sequence = require('../../lib/promise/sequence'),
     pipeline = require('../../lib/promise/pipeline'),
     common = require('../../lib/common'),
@@ -172,7 +172,7 @@ _.extend(ImportManager.prototype, {
         const tmpDir = path.join(os.tmpdir(), uuid.v4());
         this.fileToDelete = tmpDir;
 
-        return Promise.promisify(extract)(filePath, {dir: tmpDir}).then(function () {
+        return extract(filePath, {dir: tmpDir}).then(function () {
             return tmpDir;
         });
     },
@@ -235,7 +235,7 @@ _.extend(ImportManager.prototype, {
             baseDir = self.getBaseDirectory(zipDirectory);
 
             _.each(self.handlers, function (handler) {
-                if (importData.hasOwnProperty(handler.type)) {
+                if (Object.prototype.hasOwnProperty.call(importData, handler.type)) {
                     // This limitation is here to reduce the complexity of the importer for now
                     return Promise.reject(new common.errors.UnsupportedMediaTypeError({
                         message: common.i18n.t('errors.data.importer.index.zipContainsMultipleDataFormats')
@@ -326,7 +326,7 @@ _.extend(ImportManager.prototype, {
         importOptions = importOptions || {};
         var ops = [];
         _.each(this.importers, function (importer) {
-            if (importData.hasOwnProperty(importer.type)) {
+            if (Object.prototype.hasOwnProperty.call(importData, importer.type)) {
                 ops.push(function () {
                     return importer.doImport(importData[importer.type], importOptions);
                 });

@@ -1,4 +1,12 @@
 module.exports = {
+    get passwordreset() {
+        return require('./passwordreset');
+    },
+
+    get setup() {
+        return require('./setup');
+    },
+
     get posts() {
         return require('./posts');
     },
@@ -9,6 +17,14 @@ module.exports = {
 
     get invites() {
         return require('./invites');
+    },
+
+    get invitations() {
+        return require('./invitations');
+    },
+
+    get members() {
+        return require('./members');
     },
 
     get settings() {
@@ -25,5 +41,9 @@ module.exports = {
 
     get images() {
         return require('./images');
+    },
+
+    get oembed() {
+        return require('./oembed');
     }
 };

@@ -1,10 +1,38 @@
-const debug = require('ghost-ignition').debug('importer:settings'),
-    Promise = require('bluebird'),
-    _ = require('lodash'),
-    BaseImporter = require('./base'),
-    models = require('../../../../models'),
-    defaultSettings = require('../../../schema').defaultSettings,
-    labsDefaults = JSON.parse(defaultSettings.blog.labs.defaultValue);
+const debug = require('ghost-ignition').debug('importer:settings');
+const Promise = require('bluebird');
+const _ = require('lodash');
+const BaseImporter = require('./base');
+const models = require('../../../../models');
+const defaultSettings = require('../../../schema').defaultSettings;
+const labsDefaults = JSON.parse(defaultSettings.blog.labs.defaultValue);
+const deprecatedSettings = ['active_apps', 'installed_apps'];
+
+const isFalse = (value) => {
+    // Catches false, null, undefined, empty string
+    if (!value) {
+        return true;
+    }
+    if (value === 'false') {
+        return true;
+    }
+    if (value === '0') {
+        return true;
+    }
+    return false;
+};
+
+const isTrue = (value) => {
+    if (value === true) {
+        return true;
+    }
+    if (value === 'true') {
+        return true;
+    }
+    if (value === '1') {
+        return true;
+    }
+    return false;
+};
 
 class SettingsImporter extends BaseImporter {
     constructor(allDataFromFile) {
@@ -38,27 +66,9 @@ class SettingsImporter extends BaseImporter {
             });
         }
 
-        const activeApps = _.find(this.dataToImport, {key: 'active_apps'});
-        const installedApps = _.find(this.dataToImport, {key: 'installed_apps'});
-
-        const hasValueEntries = (setting = {}) => {
-            try {
-                return JSON.parse(setting.value || '[]').length !== 0;
-            } catch (e) {
-                return false;
-            }
-        };
-
-        if (hasValueEntries(activeApps) || hasValueEntries(installedApps)) {
-            this.problems.push({
-                message: 'Old settings for apps were not imported',
-                help: this.modelName,
-                context: JSON.stringify({activeApps, installedApps})
-            });
-        }
-
+        // Don't import any old, deprecated settings
         this.dataToImport = _.filter(this.dataToImport, (data) => {
-            return data.key !== 'active_apps' && data.key !== 'installed_apps';
+            return !_.includes(deprecatedSettings, data.key);
         });
 
         const permalinks = _.find(this.dataToImport, {key: 'permalinks'});
@@ -79,6 +89,26 @@ class SettingsImporter extends BaseImporter {
         this.dataToImport = _.filter(this.dataToImport, (data) => {
             return ['core', 'theme'].indexOf(data.type) === -1;
         });
+
+        const newIsPrivate = _.find(this.dataToImport, {key: 'is_private'});
+        const oldIsPrivate = _.find(this.existingData, {key: 'is_private'});
+
+        this.dataToImport = _.filter(this.dataToImport, (data) => {
+            return data.key !== 'is_private';
+        });
+
+        this.dataToImport = _.filter(this.dataToImport, (data) => {
+            return data.key !== 'password';
+        });
+
+        // Only show warning if we are importing a private site into a non-private site.
+        if (oldIsPrivate && newIsPrivate && isFalse(oldIsPrivate.value) && isTrue(newIsPrivate.value)) {
+            this.problems.push({
+                message: 'IMPORTANT: Content in this import was previously published on a private Ghost install, but the current site is public. Are your privacy settings up to date?',
+                help: this.modelName,
+                context: JSON.stringify(newIsPrivate)
+            });
+        }
 
         _.each(this.dataToImport, (obj) => {
             if (obj.key === 'labs' && obj.value) {
@@ -108,7 +138,15 @@ class SettingsImporter extends BaseImporter {
         return super.beforeImport();
     }
 
+    fetchExisting(modelOptions) {
+        return models.Settings.findAll(modelOptions)
+            .then((existingData) => {
+                this.existingData = existingData.toJSON();
+            });
+    }
+
     generateIdentifier() {
+        this.stripProperties(['id']);
         return Promise.resolve();
     }
 
