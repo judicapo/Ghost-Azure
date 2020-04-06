@@ -101,8 +101,7 @@
           "type": "config",
           "apiVersion": "2016-08-01",
           "dependsOn": [
-            "[resourceId('Microsoft.Web/sites', parameters('siteName'))]",
-            "[resourceId('Microsoft.Insights/components', variables('appInsightsName'))]"
+            "[resourceId('Microsoft.Web/sites', parameters('siteName'))]"
           ],
           "properties": {
             "url": "[concat('https://', reference(resourceId('Microsoft.Web/sites', parameters('siteName'))).hostNames[0])]",
@@ -112,8 +111,7 @@
             "mail__options__auth__pass": "[parameters('Email Password')]",
             "mail__from": "[parameters('Email From Address')]",
             "WEBSITE_NODE_DEFAULT_VERSION": "~12",
-            "SCM_COMMAND_IDLE_TIMEOUT": "300",
-            "APPINSIGHTS_INSTRUMENTATION_KEY": "[reference(concat('Microsoft.Insights/components/', variables('appInsightsName'))).InstrumentationKey]"
+            "SCM_COMMAND_IDLE_TIMEOUT": "300"
           }
         },
         {
